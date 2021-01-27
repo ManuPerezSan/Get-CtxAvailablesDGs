@@ -2,7 +2,7 @@
 Connect to remote XenDesktop farm (CVAD) to obtain data about availability of Delivery groups
 
 ## Parameter DdcServers
-    List of one Delivery Controller per farm.
+    List of Delivery Controller(s) per farm. Can be more than one Delivery controller per farm.
 
 ## Parameter Credential
     Credentials to connect to remote server and XenDesktop farm (Read-Only)
