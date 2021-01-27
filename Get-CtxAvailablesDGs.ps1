@@ -27,63 +27,71 @@ Param(
 )
 
 $DeliveryGroups = @()
+$Farms = @()
 
 Foreach($ddc in $DdcServers){
 
     $s01 = New-PsSession -Computer $ddc -Credential $Credential
 
-    try{
+    $siteName = Invoke-command -Session $s01 -ScriptBlock{ (Get-BrokerSite).Name }
+    
+    if ($Farms.IndexOf($siteName) -lt 0) {
         
-        $returnedData = Invoke-command -Session $s01 -ScriptBlock{
+        $Farms += $siteName
+        
+        try{
 
-            $array=@()
+            $returnedData = Invoke-command -Session $s01 -ScriptBlock{
 
-            Add-PSSnapin citrix.*
-            $dg = (Get-BrokerDesktopGroup -AdminAddress localhost).Name
+                $array=@()
 
-            foreach ($x in $dg){
+                Add-PSSnapin citrix.*
+                $dg = (Get-BrokerDesktopGroup -AdminAddress localhost).Name
 
-                $hash = @{}
-                
-                $machines = Get-BrokerMachine -DesktopGroupName $x -MaxRecordCount 100000
-                $maintenance = $machines | ? InMaintenanceMode -eq $true
-                $availables = $machines | ? SummaryState -eq 'Available'
-                $inUse = $machines | Where-Object {$_.SummaryState -eq 'InUse' -OR $_.SummaryState -eq 'Disconnected' }
-                $unregistered = $machines | ? RegistrationState -eq 'Unregistered'
-                $off = $machines | ? PowerState -eq 'Off'
-                $percentageAvailable = [math]::Round($availables.count / $machines.count * 100,1)
+                foreach ($x in $dg){
 
-                $Object = New-Object PSObject
-                $Statistics = New-Object PSObject
+                    $hash = @{}
 
-                $Statistics | add-member Noteproperty InUse $inUse.count
-                $Statistics | add-member Noteproperty Available $availables.count
-                $Statistics | add-member Noteproperty InMaintenance $maintenance.count
-                $Statistics | add-member Noteproperty Off $off.count
-                $Statistics | add-member Noteproperty Unregistered $unregistered.count
-                $Statistics | add-member Noteproperty PercentageAvailable $PercentageAvailable
-                $Statistics | add-member Noteproperty Total $machines.count
+                    $machines = Get-BrokerMachine -DesktopGroupName $x -MaxRecordCount 100000
+                    $maintenance = $machines | ? InMaintenanceMode -eq $true
+                    $availables = $machines | ? SummaryState -eq 'Available'
+                    $inUse = $machines | Where-Object {$_.SummaryState -eq 'InUse' -OR $_.SummaryState -eq 'Disconnected' }
+                    $unregistered = $machines | ? RegistrationState -eq 'Unregistered'
+                    $off = $machines | ? PowerState -eq 'Off'
+                    $percentageAvailable = [math]::Round($availables.count / $machines.count * 100,1)
 
-                $Object | add-member Noteproperty DeliveryGroup $x
-                $Object | add-member Noteproperty Statistics $Statistics                
+                    $Object = New-Object PSObject
+                    $Statistics = New-Object PSObject
 
-                $array += $Object
-                
-                $hash = $null
+                    $Statistics | add-member Noteproperty InUse $inUse.count
+                    $Statistics | add-member Noteproperty Available $availables.count
+                    $Statistics | add-member Noteproperty InMaintenance $maintenance.count
+                    $Statistics | add-member Noteproperty Off $off.count
+                    $Statistics | add-member Noteproperty Unregistered $unregistered.count
+                    $Statistics | add-member Noteproperty PercentageAvailable $PercentageAvailable
+                    $Statistics | add-member Noteproperty Total $machines.count
 
-            }
+                    $Object | add-member Noteproperty DeliveryGroup $x
+                    $Object | add-member Noteproperty Statistics $Statistics                
 
-            return $array
+                    $array += $Object
 
-        } | Select -Property DeliveryGroup,Statistics
+                    $hash = $null
 
-    }catch{
-        Remove-PSSession $s01 -Confirm:$false
+                }
+
+                return $array
+
+            } | Select -Property DeliveryGroup,Statistics
+
+        }catch{
+            Remove-PSSession $s01 -Confirm:$false
+        }
+        
+        $DeliveryGroups += $returnedData
     }
-
-    Remove-PSSession $s01 -Confirm:$false
-
-    $DeliveryGroups += $returnedData
+    
+    Remove-PSSession $s01 -Confirm:$false   
 
 }
 
